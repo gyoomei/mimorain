@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiMoRain — Curah Hujan Real-Time</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --font:'Outfit',system-ui,sans-serif;--font-display:'Space Grotesk',system-ui,sans-serif;--font-mono:'JetBrains Mono',monospace;
+  --bg:#08090a;--panel:#0f1012;--panel2:#16181c;--panel3:#1c1f24;
+  --text:#f0f0f5;--muted:#7a7a90;--acc:#3b82f6;--acc2:#06b6d4;--acc3:#8b5cf6;
+  --good:#22c55e;--warn:#f59e0b;--bad:#ef4444;--rain:#60a5fa;
+  --line:rgba(255,255,255,.06);--line2:rgba(255,255,255,.12);
+  --radius:12px;--radius-sm:8px;--radius-xs:6px;
+}
+[data-theme="light"]{
+  --bg:#f0f4f8;--panel:#ffffff;--panel2:#f1f5f9;--panel3:#e2e8f0;
+  --text:#0a0a14;--muted:#64748b;--acc:#2563eb;--acc2:#0891b2;--acc3:#7c3aed;
+  --line:rgba(0,0,0,.08);--line2:rgba(0,0,0,.15);
+}
+html,body{height:100%;overflow-x:hidden;background:var(--bg);color:var(--text);font-family:var(--font)}
+body{display:flex;flex-direction:column}
+button{font-family:var(--font);cursor:pointer;border:none;background:none;color:var(--text);font-size:13px}
+input{font-family:var(--font);font-size:13px;background:var(--panel2);color:var(--text);border:1px solid var(--line2);border-radius:var(--radius-xs);padding:8px 12px;outline:none}
+input:focus{border-color:var(--acc)}
+
+nav{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-shrink:0;z-index:10}
+.nav-logo{font-family:var(--font-display);font-weight:700;font-size:16px;letter-spacing:-.03em;background:linear-gradient(135deg,#3b82f6,#06b6d4,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-sep{width:1px;height:20px;background:var(--line2)}
+.nav-btn{padding:6px 12px;border-radius:var(--radius-xs);background:var(--panel2);border:1px solid var(--line);transition:all .15s;font-size:12px;font-weight:500}
+.nav-btn:hover{border-color:var(--acc);color:var(--acc)}
+.nav-btn.active{background:var(--acc);color:#fff;border-color:var(--acc)}
+.nav-spacer{flex:1}
+.icon-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-xs);background:var(--panel2);border:1px solid var(--line);font-size:15px;transition:all .15s}
+.icon-btn:hover{border-color:var(--acc)}
+.theme-toggle::before{content:'🌙'}
+[data-theme="light"] .theme-toggle::before{content:'☀️'}
+
+.search-bar{display:flex;gap:8px;align-items:center;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.search-bar input{flex:1;max-width:400px}
+.search-bar .nav-btn{white-space:nowrap}
+
+.main{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px;max-width:1200px;margin:0 auto;width:100%}
+
+.current-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:24px;display:flex;gap:24px;align-items:center;flex-wrap:wrap}
+.current-icon{font-size:64px;line-height:1}
+.current-info{flex:1;min-width:200px}
+.current-location{font-family:var(--font-display);font-size:22px;font-weight:700}
+.current-time{font-size:12px;color:var(--muted);margin-top:2px}
+.current-rain{font-family:var(--font-display);font-size:48px;font-weight:700;margin-top:4px}
+.current-rain .unit{font-size:16px;font-weight:400;color:var(--muted)}
+.current-label{font-size:13px;color:var(--muted)}
+.current-stats{display:flex;gap:16px;margin-top:8px}
+.stat{font-family:var(--font-mono);font-size:12px;padding:4px 10px;background:var(--panel2);border-radius:var(--radius-xs);border:1px solid var(--line)}
+.stat .label{color:var(--muted);font-family:var(--font);margin-right:4px}
+
+.rain-canvas-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;position:relative;height:200px}
+#rainCanvas{width:100%;height:100%;display:block}
+
+.chart-section{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+.chart-title{font-family:var(--font-display);font-size:13px;font-weight:600;margin-bottom:12px}
+.chart-wrap{position:relative;height:180px}
+#chartCanvas{width:100%;height:100%;display:block}
+.chart-legend{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
+.legend-dot{width:8px;height:8px;border-radius:2px}
+
+.forecast-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.forecast-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px;text-align:center;transition:all .15s}
+.forecast-card:hover{border-color:var(--acc)}
+.fc-day{font-size:11px;color:var(--muted);font-weight:500}
+.fc-icon{font-size:24px;margin:6px 0}
+.fc-rain{font-family:var(--font-mono);font-size:13px;font-weight:600}
+.fc-mm{font-size:10px;color:var(--muted)}
+.fc-prob{font-size:10px;color:var(--muted);margin-top:2px}
+
+.insight-section{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;display:flex;gap:12px;align-items:flex-start}
+.insight-icon{font-size:24px;flex-shrink:0;margin-top:2px}
+.insight-text{font-size:13px;line-height:1.6}
+.insight-text strong{color:var(--acc)}
+
+.status-bar{display:flex;align-items:center;gap:12px;padding:4px 16px;background:var(--panel);border-top:1px solid var(--line);font-family:var(--font-mono);font-size:10px;color:var(--muted);flex-shrink:0}
+.toast{position:fixed;bottom:50px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel3);color:var(--text);padding:8px 16px;border-radius:var(--radius);border:1px solid var(--line2);font-size:12px;z-index:999;opacity:0;transition:all .3s;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.loading{display:none;text-align:center;padding:40px;color:var(--muted)}
+.loading.show{display:block}
+.loading .spinner{display:inline-block;width:32px;height:32px;border:3px solid var(--line2);border-top-color:var(--acc);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.error{text-align:center;padding:40px;color:var(--bad);display:none}
+.error.show{display:block}
+
+@media(max-width:700px){
+  .current-card{flex-direction:column;text-align:center;align-items:center}
+  .current-stats{justify-content:center}
+  .forecast-grid{grid-template-columns:repeat(4,1fr)}
+  .search-bar{flex-wrap:wrap}
+  .search-bar input{max-width:100%}
+}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+</style>
+</head>
+<body>
+<nav>
+  <span class="nav-logo">🌧️ MiMoRain</span>
+  <div class="nav-sep"></div>
+  <span style="font-size:12px;color:var(--muted)">Curah Hujan Real-Time</span>
+  <span class="nav-spacer"></span>
+  <button class="icon-btn" onclick="getLocation()" title="Use my location">📍</button>
+  <button class="icon-btn theme-toggle" onclick="toggleTheme()"></button>
+</nav>
+
+<div class="search-bar">
+  <input type="text" id="cityInput" placeholder="Masukkan nama kota (contoh: Jakarta, Surabaya, Bandung)..." onkeydown="if(event.key==='Enter')searchCity()">
+  <button class="nav-btn active" onclick="searchCity()">🔍 Cari</button>
+  <button class="nav-btn" onclick="getLocation()">📍 Lokasi Saya</button>
+</div>
+
+<div class="main">
+  <div class="loading" id="loading"><div class="spinner"></div><div style="margin-top:8px">Mengambil data cuaca...</div></div>
+  <div class="error" id="error"></div>
+
+  <div id="weatherContent" style="display:none">
+    <div class="current-card">
+      <div class="current-icon" id="currentIcon">🌧️</div>
+      <div class="current-info">
+        <div class="current-location" id="locationName">Jakarta</div>
+        <div class="current-time" id="currentTime">—</div>
+        <div class="current-rain"><span id="currentRain">0.0</span><span class="unit"> mm/jam</span></div>
+        <div class="current-label" id="currentLabel">Tidak ada hujan</div>
+        <div class="current-stats">
+          <div class="stat"><span class="label">Probabilitas</span><span id="currentProb">0%</span></div>
+          <div class="stat"><span class="label">Showers</span><span id="currentShowers">0.0 mm</span></div>
+          <div class="stat"><span class="label">Elevasi</span><span id="elevation">0 m</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rain-canvas-wrap">
+      <canvas id="rainCanvas"></canvas>
+    </div>
+
+    <div class="chart-section">
+      <div class="chart-title">📊 Curah Hujan 24 Jam ke Depan</div>
+      <div class="chart-wrap"><canvas id="chartCanvas"></canvas></div>
+      <div class="chart-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>Presipitasi (mm)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#06b6d4"></div>Probabilitas (%)</div>
+      </div>
+    </div>
+
+    <div class="chart-title" style="padding:0 4px">📅 Prakiraan 7 Hari</div>
+    <div class="forecast-grid" id="forecastGrid"></div>
+
+    <div class="insight-section">
+      <div class="insight-icon" id="insightIcon">💡</div>
+      <div class="insight-text" id="insightText">Memuat insight...</div>
+    </div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <span id="statusAPI">Open-Meteo API · Free</span>
+  <span style="flex:1"></span>
+  <span>MiMoRain v1.0 · Zero API Key</span>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let weatherData = null;
+let rainDrops = [];
+let animFrame = null;
+
+const API = 'https://api.open-meteo.com/v1/forecast';
+
+// City coordinates (major Indonesian cities + popular)
+const CITIES = {
+  'jakarta': {lat:-6.2,lon:106.8,name:'Jakarta'},
+  'surabaya': {lat:-7.3,lon:112.7,name:'Surabaya'},
+  'bandung': {lat:-6.9,lon:107.6,name:'Bandung'},
+  'medan': {lat:3.6,lon:98.7,name:'Medan'},
+  'semarang': {lat:-7.0,lon:110.4,name:'Semarang'},
+  'makassar': {lat:-5.1,lon:119.4,name:'Makassar'},
+  'palembang': {lat:-3.0,lon:104.7,name:'Palembang'},
+  'tangerang': {lat:-6.2,lon:106.6,name:'Tangerang'},
+  'depok': {lat:-6.4,lon:106.8,name:'Depok'},
+  'bekasi': {lat:-6.2,lon:107.0,name:'Bekasi'},
+  'yogyakarta': {lat:-7.8,lon:110.4,name:'Yogyakarta'},
+  'malang': {lat:-8.0,lon:112.6,name:'Malang'},
+  'denpasar': {lat:-8.7,lon:115.2,name:'Denpasar'},
+  'manado': {lat:1.5,lon:124.8,name:'Manado'},
+  'pontianak': {lat:-0.0,lon:109.3,name:'Pontianak'},
+  'banjarmasin': {lat:-3.3,lon:114.6,name:'Banjarmasin'},
+  'balikpapan': {lat:-1.3,lon:116.8,name:'Balikpapan'},
+  'padang': {lat:-0.9,lon:100.4,name:'Padang'},
+  'pekanbaru': {lat:0.5,lon:101.4,name:'Pekanbaru'},
+  'solo': {lat:-7.6,lon:110.8,name:'Solo'},
+  'bogor': {lat:-6.6,lon:106.8,name:'Bogor'},
+  'singapore': {lat:1.35,lon:103.8,name:'Singapore'},
+  'kuala lumpur': {lat:3.1,lon:101.7,name:'Kuala Lumpur'},
+  'bangkok': {lat:13.8,lon:100.5,name:'Bangkok'},
+  'tokyo': {lat:35.7,lon:139.7,name:'Tokyo'},
+  'london': {lat:51.5,lon:-0.1,name:'London'},
+};
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+function init() {
+  const saved = localStorage.getItem('mimorain-city');
+  if (saved) {
+    document.getElementById('cityInput').value = saved;
+    searchCity();
+  }
+}
+
+// ═══════════════════════════════════════
+// GEOCODING
+// ═══════════════════════════════════════
+async function searchCity() {
+  const input = document.getElementById('cityInput').value.trim().toLowerCase();
+  if (!input) return toast('Masukkan nama kota');
+
+  showLoading();
+
+  // Check local cities first
+  if (CITIES[input]) {
+    const c = CITIES[input];
+    localStorage.setItem('mimorain-city', input);
+    await fetchWeather(c.lat, c.lon, c.name);
+    return;
+  }
+
+  // Geocode via Open-Meteo
+  try {
+    const resp = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(input)}&count=1&language=id`);
+    const data = await resp.json();
+    if (!data.results || data.results.length === 0) {
+      showError(`Kota "${input}" tidak ditemukan. Coba: Jakarta, Surabaya, Bandung, dll.`);
+      return;
+    }
+    const r = data.results[0];
+    const name = `${r.name}${r.admin1 ? ', ' + r.admin1 : ''}${r.country ? ', ' + r.country : ''}`;
+    localStorage.setItem('mimorain-city', input);
+    await fetchWeather(r.latitude, r.longitude, name);
+  } catch(e) {
+    showError('Gagal mencari lokasi: ' + e.message);
+  }
+}
+
+function getLocation() {
+  if (!navigator.geolocation) return toast('Geolocation tidak didukung');
+  showLoading();
+  navigator.geolocation.getCurrentPosition(
+    pos => fetchWeather(pos.coords.latitude, pos.coords.longitude, 'Lokasi Saya'),
+    () => showError('Gagal mendapatkan lokasi. Izinkan akses lokasi di browser.')
+  );
+}
+
+// ═══════════════════════════════════════
+// FETCH WEATHER
+// ═══════════════════════════════════════
+async function fetchWeather(lat, lon, name) {
+  try {
+    const url = `${API}?latitude=${lat}&longitude=${lon}&hourly=precipitation,rain,showers,precipitation_probability&current=rain,precipitation,showers,precipitation_probability&timezone=auto&forecast_days=7`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+    weatherData = await resp.json();
+    weatherData._name = name;
+    render();
+  } catch(e) {
+    showError('Gagal mengambil data: ' + e.message);
+  }
+}
+
+// ═══════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════
+function render() {
+  if (!weatherData) return;
+  document.getElementById('loading').classList.remove('show');
+  document.getElementById('error').classList.remove('show');
+  document.getElementById('weatherContent').style.display = '';
+
+  const d = weatherData;
+  const c = d.current;
+  const h = d.hourly;
+
+  // Current
+  document.getElementById('locationName').textContent = d._name;
+  document.getElementById('currentTime').textContent = formatTime(c.time);
+  document.getElementById('currentRain').textContent = c.precipitation.toFixed(1);
+  document.getElementById('currentProb').textContent = (c.precipitation_probability || 0) + '%';
+  document.getElementById('currentShowers').textContent = (c.showers || 0).toFixed(1) + ' mm';
+  document.getElementById('elevation').textContent = (d.elevation || 0) + ' m';
+
+  // Icon & label
+  const rain = c.precipitation;
+  let icon, label;
+  if (rain === 0) { icon = '☀️'; label = 'Tidak ada hujan'; }
+  else if (rain < 0.5) { icon = '🌦️'; label = 'Hujan ringan'; }
+  else if (rain < 5) { icon = '🌧️'; label = 'Hujan sedang'; }
+  else if (rain < 20) { icon = '⛈️'; label = 'Hujan lebat'; }
+  else { icon = '🌊'; label = 'Hujan sangat lebat — waspada banjir!'; }
+  document.getElementById('currentIcon').textContent = icon;
+  document.getElementById('currentLabel').textContent = label;
+
+  // Chart
+  renderChart(h);
+
+  // Forecast
+  renderForecast(h);
+
+  // Insight
+  renderInsight(c, h);
+
+  // Rain animation
+  startRainAnimation(rain);
+}
+
+function renderChart(h) {
+  const canvas = document.getElementById('chartCanvas');
+  const ctx = canvas.getContext('2d');
+  const wrap = canvas.parentElement;
+  canvas.width = wrap.clientWidth * 2;
+  canvas.height = wrap.clientHeight * 2;
+  ctx.scale(2, 2);
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  const pad = {top:20,right:50,bottom:30,left:50};
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Next 24 hours
+  const now = new Date();
+  const startIdx = h.time.findIndex(t => new Date(t) >= now);
+  const slice = 24;
+  const times = h.time.slice(startIdx, startIdx + slice);
+  const precip = h.precipitation.slice(startIdx, startIdx + slice);
+  const prob = h.precipitation_probability.slice(startIdx, startIdx + slice);
+
+  if (!times.length) return;
+
+  const chartW = W - pad.left - pad.right;
+  const chartH = H - pad.top - pad.bottom;
+  const maxPrecip = Math.max(5, ...precip) * 1.2;
+  const barW = chartW / times.length;
+
+  // Grid
+  ctx.strokeStyle = 'rgba(128,128,128,.15)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (chartH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+    ctx.font = '10px JetBrains Mono';
+    ctx.textAlign = 'right';
+    ctx.fillText((maxPrecip * (4-i) / 4).toFixed(1), pad.left - 6, y + 3);
+  }
+
+  // Bars
+  times.forEach((t, i) => {
+    const x = pad.left + i * barW;
+    const val = precip[i];
+    const h2 = (val / maxPrecip) * chartH;
+    const y = pad.top + chartH - h2;
+
+    // Gradient bar
+    const grad = ctx.createLinearGradient(x, y, x, pad.top + chartH);
+    if (val > 10) { grad.addColorStop(0, '#ef4444'); grad.addColorStop(1, '#7c3aed'); }
+    else if (val > 2) { grad.addColorStop(0, '#3b82f6'); grad.addColorStop(1, '#06b6d4'); }
+    else { grad.addColorStop(0, '#60a5fa'); grad.addColorStop(1, '#93c5fd'); }
+    ctx.fillStyle = grad;
+    ctx.fillRect(x + 2, y, barW - 4, h2);
+
+    // Probability line
+    if (i > 0) {
+      const prevX = pad.left + (i-1) * barW + barW/2;
+      const prevY = pad.top + chartH - (prob[i-1] / 100) * chartH;
+      const curX = x + barW/2;
+      const curY = pad.top + chartH - (prob[i] / 100) * chartH;
+      ctx.strokeStyle = '#06b6d4';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(prevX, prevY); ctx.lineTo(curX, curY); ctx.stroke();
+    }
+
+    // Time label (every 3 hours)
+    if (i % 3 === 0) {
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+      ctx.font = '9px JetBrains Mono';
+      ctx.textAlign = 'center';
+      ctx.fillText(t.slice(11, 16), x + barW/2, H - pad.bottom + 14);
+    }
+  });
+}
+
+function renderForecast(h) {
+  const grid = document.getElementById('forecastGrid');
+  // Group by day
+  const days = {};
+  h.time.forEach((t, i) => {
+    const day = t.slice(0, 10);
+    if (!days[day]) days[day] = {precip:0, prob:0, count:0};
+    days[day].precip += h.precipitation[i];
+    days[day].prob = Math.max(days[day].prob, h.precipitation_probability[i]);
+    days[day].count++;
+  });
+
+  const dayNames = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+  const entries = Object.entries(days).slice(0, 7);
+
+  grid.innerHTML = entries.map(([date, d]) => {
+    const dt = new Date(date + 'T12:00:00');
+    const dayName = dayNames[dt.getDay()];
+    const total = d.precip;
+    let icon;
+    if (total === 0) icon = '☀️';
+    else if (total < 5) icon = '🌦️';
+    else if (total < 20) icon = '🌧️';
+    else icon = '⛈️';
+    return `<div class="forecast-card">
+      <div class="fc-day">${dayName}</div>
+      <div class="fc-icon">${icon}</div>
+      <div class="fc-rain">${total.toFixed(1)}<span class="fc-mm"> mm</span></div>
+      <div class="fc-prob">${d.prob}% prob</div>
+    </div>`;
+  }).join('');
+}
+
+function renderInsight(c, h) {
+  const rain = c.precipitation;
+  const prob = c.precipitation_probability || 0;
+  const now = new Date();
+  const startIdx = h.time.findIndex(t => new Date(t) >= now);
+  const next6 = h.precipitation.slice(startIdx, startIdx + 6);
+  const next6Total = next6.reduce((a,b) => a+b, 0);
+  const next6Max = Math.max(...next6);
+
+  let text, icon;
+  if (rain > 10) {
+    icon = '⚠️';
+    text = `<strong>Hujan lebat saat ini</strong> (${rain.toFixed(1)} mm/jam). Hindari area rawan banjir. Prediksi ${next6Total.toFixed(1)} mm dalam 6 jam ke depan.`;
+  } else if (rain > 0) {
+    icon = '🌧️';
+    text = `Hujan ringan-sedang berlangsung. Dalam 6 jam ke depan diprediksi <strong>${next6Total.toFixed(1)} mm</strong> tambahan. ${next6Max > 5 ? 'Ada potensi hujan membesar.' : 'Hujan akan mereda.'}`;
+  } else if (prob > 60) {
+    icon = '🌂';
+    text = `<strong>Probabilitas hujan tinggi (${prob}%)</strong>. Siapkan payung! Diprediksi ${next6Total.toFixed(1)} mm dalam 6 jam ke depan.`;
+  } else if (next6Total > 0) {
+    icon = '🌤️';
+    text = `Saat ini cerah, tapi diprediksi <strong>${next6Total.toFixed(1)} mm</strong> hujan dalam 6 jam ke depan. ${next6Max > 5 ? 'Bawa payung untuk jaga-jaga.' : 'Kemungkinan hanya gerimis.'}`;
+  } else {
+    icon = '☀️';
+    text = `<strong>Cerah dan kering</strong> untuk 24 jam ke depan. Tidak ada hujan yang diprediksi. Cocok untuk aktivitas outdoor!`;
+  }
+
+  document.getElementById('insightIcon').textContent = icon;
+  document.getElementById('insightText').innerHTML = text;
+}
+
+// ═══════════════════════════════════════
+// RAIN ANIMATION
+// ═══════════════════════════════════════
+function startRainAnimation(intensity) {
+  const canvas = document.getElementById('rainCanvas');
+  const ctx = canvas.getContext('2d');
+  const wrap = canvas.parentElement;
+
+  if (animFrame) cancelAnimationFrame(animFrame);
+
+  function resize() {
+    canvas.width = wrap.clientWidth * 2;
+    canvas.height = wrap.clientHeight * 2;
+  }
+  resize();
+
+  // Generate drops based on intensity
+  const count = Math.min(300, Math.round(intensity * 30 + 20));
+  rainDrops = [];
+  for (let i = 0; i < count; i++) {
+    rainDrops.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      speed: 4 + Math.random() * 8 + intensity * 0.5,
+      length: 10 + Math.random() * 20 + intensity,
+      opacity: 0.2 + Math.random() * 0.5
+    });
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Background gradient
+    const isDark = document.documentElement.dataset.theme === 'dark';
+    if (intensity > 5) {
+      ctx.fillStyle = isDark ? 'rgba(15,18,30,0.95)' : 'rgba(180,190,210,0.9)';
+    } else if (intensity > 0) {
+      ctx.fillStyle = isDark ? 'rgba(20,25,40,0.9)' : 'rgba(200,210,230,0.85)';
+    } else {
+      ctx.fillStyle = isDark ? 'rgba(10,12,18,0.8)' : 'rgba(220,230,245,0.8)';
+    }
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw drops
+    rainDrops.forEach(d => {
+      ctx.strokeStyle = isDark ? `rgba(150,200,255,${d.opacity})` : `rgba(50,100,200,${d.opacity})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(d.x, d.y);
+      ctx.lineTo(d.x - 1, d.y + d.length);
+      ctx.stroke();
+
+      d.y += d.speed;
+      if (d.y > canvas.height) {
+        d.y = -d.length;
+        d.x = Math.random() * canvas.width;
+      }
+    });
+
+    // Splash at bottom
+    if (intensity > 2) {
+      for (let i = 0; i < Math.min(10, intensity); i++) {
+        const sx = Math.random() * canvas.width;
+        const sy = canvas.height - 5;
+        ctx.fillStyle = isDark ? 'rgba(150,200,255,0.3)' : 'rgba(50,100,200,0.2)';
+        ctx.beginPath();
+        ctx.arc(sx, sy, 2 + Math.random() * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    animFrame = requestAnimationFrame(animate);
+  }
+
+  animate();
+}
+
+// ═══════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════
+function formatTime(t) {
+  if (!t) return '—';
+  const d = new Date(t);
+  const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+  return `${days[d.getDay()]}, ${d.toLocaleDateString('id-ID')} ${d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}`;
+}
+
+function showLoading() {
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('error').classList.remove('show');
+  document.getElementById('weatherContent').style.display = 'none';
+}
+
+function showError(msg) {
+  document.getElementById('loading').classList.remove('show');
+  document.getElementById('error').textContent = msg;
+  document.getElementById('error').classList.add('show');
+  document.getElementById('weatherContent').style.display = 'none';
+}
+
+function toggleTheme() {
+  const h = document.documentElement;
+  h.dataset.theme = h.dataset.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('mimo-theme', h.dataset.theme);
+  if (weatherData) render();
+}
+const t = localStorage.getItem('mimo-theme');
+if (t) document.documentElement.dataset.theme = t;
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 1500);
+}
+
+// Resize
+window.addEventListener('resize', () => { if (weatherData) { renderChart(weatherData.hourly); startRainAnimation(weatherData.current.precipitation); }});
+
+init();
+</script>
+</body>
+</html>
